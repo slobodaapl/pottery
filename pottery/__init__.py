@@ -42,41 +42,43 @@ __keywords__: Final[str] = 'Redis client persistent storage'
 __copyright__: Final[str] = f'Copyright © 2015-2022, {__author__}, original author.'
 
 
-from .monkey import PotteryEncoder  # isort: skip
-
-from .exceptions import PotteryError  # isort:skip
-from .exceptions import KeyExistsError  # isort:skip
-from .exceptions import RandomKeyError  # isort:skip
-from .exceptions import QueueEmptyError  # isort:skip
-from .exceptions import PrimitiveError  # isort:skip
-from .exceptions import QuorumIsImpossible  # isort:skip
-from .exceptions import QuorumNotAchieved  # isort:skip
-from .exceptions import TooManyExtensions  # isort:skip
-from .exceptions import ExtendUnlockedLock  # isort:skip
-from .exceptions import ReleaseUnlockedLock  # isort:skip
-from .exceptions import PotteryWarning  # isort:skip
-from .exceptions import InefficientAccessWarning  # isort:skip
-
-from .cache import CachedOrderedDict  # isort:skip
-from .cache import redis_cache  # isort:skip
-from .aionextid import AIONextID  # isort:skip
-from .nextid import NextID  # isort:skip
-from .aioredlock import AIORedlock  # isort:skip
-from .redlock import Redlock  # isort:skip
-from .redlock import synchronize  # isort:skip
-from .timer import ContextTimer  # isort:skip
-
-from .counter import RedisCounter
-from .deque import RedisDeque
-from .dict import RedisDict
-from .list import RedisList
-from .queue import RedisSimpleQueue
-from .set import RedisSet
-
-
-from .bloom import BloomFilter  # isort:skip
-from .hyper import HyperLogLog  # isort:skip
-
+try:
+    from .monkey import PotteryEncoder  # isort: skip
+    
+    from .exceptions import PotteryError  # isort:skip
+    from .exceptions import KeyExistsError  # isort:skip
+    from .exceptions import RandomKeyError  # isort:skip
+    from .exceptions import QueueEmptyError  # isort:skip
+    from .exceptions import PrimitiveError  # isort:skip
+    from .exceptions import QuorumIsImpossible  # isort:skip
+    from .exceptions import QuorumNotAchieved  # isort:skip
+    from .exceptions import TooManyExtensions  # isort:skip
+    from .exceptions import ExtendUnlockedLock  # isort:skip
+    from .exceptions import ReleaseUnlockedLock  # isort:skip
+    from .exceptions import PotteryWarning  # isort:skip
+    from .exceptions import InefficientAccessWarning  # isort:skip
+    
+    from .cache import CachedOrderedDict  # isort:skip
+    from .cache import redis_cache  # isort:skip
+    from .aionextid import AIONextID  # isort:skip
+    from .nextid import NextID  # isort:skip
+    from .aioredlock import AIORedlock  # isort:skip
+    from .redlock import Redlock  # isort:skip
+    from .redlock import synchronize  # isort:skip
+    from .timer import ContextTimer  # isort:skip
+    
+    from .counter import RedisCounter
+    from .deque import RedisDeque
+    from .dict import RedisDict
+    from .list import RedisList
+    from .queue import RedisSimpleQueue
+    from .set import RedisSet
+    
+    
+    from .bloom import BloomFilter  # isort:skip
+    from .hyper import HyperLogLog  # isort:skip
+except ModuleNotFoundError:
+    pass
 
 __all__: Final[Tuple[str, ...]] = (
     'PotteryEncoder',
