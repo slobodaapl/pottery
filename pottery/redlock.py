@@ -63,6 +63,7 @@ from redis.asyncio import Redis as AIORedis
 from redis.commands.core import Script
 
 from .annotations import F
+from .aioredlock import AIORedlock
 from .base import Primitive
 from .base import logger
 from .exceptions import ExtendUnlockedLock
@@ -677,8 +678,25 @@ class Redlock(Scripts, Primitive):
         return f'<{self.__class__.__qualname__} key={self.key}>'
 
 
+class _dynpartial(partial):
+    """
+    Partial based on partial from functools, but allows passing argument
+    generators to receive arguments at call time dynamically.
+    """
+
+    def __call__(self, *args, **kwargs):
+        # Update the keyword arguments with generated values
+        new_kwargs = {
+            k: (v() if callable(v) else v)
+            for k, v in self.keywords.items()
+        }
+        # Combine with any kwargs passed during the call
+        new_kwargs.update(kwargs)
+        return super().__call__(*args, **new_kwargs)
+
+
 def synchronize(*,
-                key: str,
+                key: str | Callable[..., str],
                 masters: Iterable[Redis] = frozenset(),
                 raise_on_redis_errors: bool = False,
                 auto_release_time: float = Redlock._AUTO_RELEASE_TIME,
@@ -688,7 +706,7 @@ def synchronize(*,
     '''Decorator to synchronize a function's execution across threads.
 
     synchronize() is a decorator that allows only one thread to execute a
-    function at a time.  Under the hood, synchronize() uses a Redlock.  See
+    function at a time. Under the hood, synchronize() uses a Redlock. See
     help(Redlock) for more details.
 
     Keyword arguments:
@@ -699,13 +717,9 @@ def synchronize(*,
             exception when too many Redis masters throw errors
         auto_release_time -- the timeout in seconds by which to automatically
             release this Redlock, unless it's already been released
-        num_extensions -- the number of times that this Redlock's lease can be
-            extended
-        context_manager_blocking -- when using this Redlock as a context
-            manager, whether to block when acquiring
-        context_manager_timeout -- if context_manager_blocking, how long to wait
-            when acquiring before giving up and raising the QuorumNotAchieved
-            exception
+        blocking -- whether to block when acquiring the lock
+        timeout -- if blocking, how long to wait when acquiring before giving
+            up and raising the QuorumNotAchieved exception
 
     Usage:
 
@@ -717,7 +731,7 @@ def synchronize(*,
         >>> func()
         True
     '''
-    RedlockFactory = functools.partial(
+    RedlockFactory = _dynpartial(
         Redlock,
         key=key,
         masters=masters,
@@ -727,24 +741,54 @@ def synchronize(*,
         context_manager_timeout=timeout,
     )
 
+    AIORedlockFactory = _dynpartial(
+        AIORedlock,
+        key=key,
+        masters=masters,
+        raise_on_redis_errors=raise_on_redis_errors,
+        auto_release_time=auto_release_time,
+        context_manager_blocking=blocking,
+        context_manager_timeout=timeout,
+    )
+
     def decorator(func: F) -> F:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            redlock = RedlockFactory()
-            waiting_timer, holding_timer = ContextTimer(), ContextTimer()
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                redlock = RedlockFactory()
+                waiting_timer, holding_timer = ContextTimer(), ContextTimer()
 
-            try:
-                waiting_timer.start()
-                with redlock:
-                    waiting_timer.stop()
-                    holding_timer.start()
-                    return_value = func(*args, **kwargs)
-                holding_timer.stop()
-            finally:
-                _log_synchronize(func, redlock, waiting_timer, holding_timer)
+                try:
+                    waiting_timer.start()
+                    async with redlock:
+                        waiting_timer.stop()
+                        holding_timer.start()
+                        return_value = await func(*args, **kwargs)
+                    holding_timer.stop()
+                finally:
+                    _log_synchronize(func, redlock, waiting_timer, holding_timer)
 
-            return return_value
-        return cast(F, wrapper)
+                return return_value
+            return cast(F, async_wrapper)
+        else:
+            @functools.wraps(func)
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                redlock = RedlockFactory()
+                waiting_timer, holding_timer = ContextTimer(), ContextTimer()
+
+                try:
+                    waiting_timer.start()
+                    with redlock:
+                        waiting_timer.stop()
+                        holding_timer.start()
+                        return_value = func(*args, **kwargs)
+                    holding_timer.stop()
+                finally:
+                    _log_synchronize(func, redlock, waiting_timer, holding_timer)
+
+                return return_value
+            return cast(F, sync_wrapper)
+
     return decorator
 
 
