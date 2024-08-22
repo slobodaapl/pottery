@@ -23,7 +23,7 @@ from setuptools import setup
 
 
 _package_dir = pathlib.Path(__file__).parent
-_long_description = (_package_dir / 'README.md').read_text()
+_long_description = (_package_dir / 'README.md').read_text(encoding="utf-8")
 
 
 setup(
